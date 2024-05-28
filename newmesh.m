@@ -2,14 +2,129 @@ clc;
 clear all;
 
 %All inputs
-B = 2;
+B = 2.5;
 L = 10;
 D = 10;
-Nd = 30;
-Nb = 30;
+Nd = 3;
+Nb = 3;
+
+%Inputs for fan mesh
+Lf = 5; % length of fan base
+Nlf = 3; % division of fan base
+Df = 5; %Depth of fan mesh
+Ndf = 3 ; % division of fan dept(left an right)
 
 %Function call
-generateMesh(B,L,D,Nd,Nb);
+
+    %generateMesh(B,L,D,Nd,Nb);
+    generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb)
+
+%function to genrate fan mesh
+function generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb)
+    
+    y_coor_of_symm_side = linspace(0,-Df,Ndf+1); 
+    y_coor_of_footing_edge_side = zeros(size(y_coor_of_symm_side)); % footing edge y-coor to connect to the symm side to draw radial lines
+    x_coor_of_symm_side = zeros(size(y_coor_of_symm_side)); %x-xoor of symmetric side
+    x_coor_of_footing_edge_side = B*ones(size(y_coor_of_footing_edge_side)); %x-coor of footing edge point
+    
+    plot([x_coor_of_footing_edge_side;x_coor_of_symm_side],[y_coor_of_footing_edge_side;y_coor_of_symm_side],'k-');
+    hold on;
+    
+    %for drawing lines below footing
+    x_coor_of_fan_base = linspace(0,Lf,Nlf+1);
+    y_coor_of_fan_base = -Df*ones(size(x_coor_of_fan_base));
+    x_coor_of_footing_edge_for_below = B*ones(size(x_coor_of_fan_base));
+    y_coor_of_footing_edge_for_below = zeros(size(x_coor_of_footing_edge_for_below));
+    plot([x_coor_of_footing_edge_for_below;x_coor_of_fan_base],[y_coor_of_footing_edge_for_below;y_coor_of_fan_base],'k-');
+    
+    %for drawing inclined lines on right side
+    y_coor_of_rightside_fan = linspace(0,-Df,Ndf+1);
+    x_coor_of_rightside_fan = Lf*ones(size(y_coor_of_rightside_fan));
+    plot([x_coor_of_footing_edge_side;x_coor_of_rightside_fan],[y_coor_of_footing_edge_side;y_coor_of_rightside_fan],'k-');
+    
+    %for drawaing rectangular lines
+    x_coor_of_footing_base = linspace(0,B,Nb+1);
+    x_coor_of_footing_base([1,Nb+1])=[];
+    y_coor_of_footing_base = zeros(size(x_coor_of_footing_base));
+    
+    eqn_of_left_incl_line = polyfit([B,0],[0,-Df],1);
+    eqn_of_right_incl_line = polyfit([B,Lf],[0,-Df],1);
+    m_left=eqn_of_left_incl_line(1); c_left=eqn_of_left_incl_line(2);
+    m_right = eqn_of_right_incl_line(1); c_right = eqn_of_right_incl_line(2);
+    
+    y_coor_of_left_incl_line = m_left*x_coor_of_footing_base + c_left;
+    x_coor_of_right_incl_line = (y_coor_of_left_incl_line - c_right)/m_right;
+    y_coor_of_footing_right = zeros(size(x_coor_of_right_incl_line));
+    
+    plot([x_coor_of_footing_base;x_coor_of_footing_base;x_coor_of_right_incl_line;x_coor_of_right_incl_line],[y_coor_of_footing_base;y_coor_of_left_incl_line;y_coor_of_left_incl_line;y_coor_of_footing_right],'k-');
+    grid on;
+    
+    GetYCoordinateLeftRight(Nb,B,Ndf,Df,x_coor_of_footing_base,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,y_coor_of_symm_side,x_coor_of_symm_side,y_coor_of_left_incl_line);
+    GetXCoordinateMiddle(Df,Lf, Nlf,Ndf, y_coor_of_left_incl_line, x_coor_of_right_incl_line, x_coor_of_footing_base,x_coor_of_footing_edge_for_below,x_coor_of_fan_base,y_coor_of_footing_edge_for_below,y_coor_of_fan_base);
+
+end
+
+%function to get Y-coordinate of the interior of the fan mesh on right side.
+
+function GetYCoordinateLeftRight(Nb,B,Ndf,Df,x_coor_of_footing_base,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,y_coor_of_symm_side,x_coor_of_symm_side,y_coor_of_left_incl_line)
+    x_coor_of_footing_base=[x_coor_of_footing_base,B];
+    x_coor_of_interior = repmat(x_coor_of_footing_base,Ndf+1,1);
+    x_coor_of_interior = [x_coor_of_symm_side',x_coor_of_interior];
+    
+
+    
+    x_coor_of_footing_edge_side([1,Ndf+1])=[];
+    y_coor_of_footing_edge_side([1,Ndf+1])=[];
+    y_coor_of_symm_side([1,Ndf+1])=[];
+    x_coor_of_symm_side([1,Ndf+1])=[];
+    %disp(y_coor_of_symm_side);
+    
+    
+    for i=1:Ndf-1
+        eqn = polyfit([x_coor_of_footing_edge_side(i),x_coor_of_symm_side(i)],[y_coor_of_footing_edge_side(i),y_coor_of_symm_side(i)],1);
+        m= eqn(1); c=eqn(2);
+        y_coor_interior(i,:)=m*x_coor_of_footing_base + c;
+        %disp(y_coor_interior);
+    end
+    
+    y_coor_size = size(y_coor_interior);
+    y_coor_of_footing_base = zeros(1,y_coor_size(2));
+    
+    y_coor_of_left_incl_line = [y_coor_of_left_incl_line,0];
+    y_coor_interior=[y_coor_of_footing_base;y_coor_interior;y_coor_of_left_incl_line];
+    y_coor_int_size = size(y_coor_interior);
+    y_coor_symm_side = linspace(0,-Df,Ndf+1);
+    
+    y_coor_interior=[y_coor_symm_side',y_coor_interior];
+    y_coor_interior(:,y_coor_size(2)+1)=[];
+    
+    x_coor_of_interior(:,y_coor_size(2)+1)=[];
+    
+    %generate quads mesh
+    for i=1:Ndf
+        for j=1:Nb-1
+            Divide_Quadri(x_coor_of_interior(i,j),x_coor_of_interior(i+1,j),x_coor_of_interior(i+1,j+1),x_coor_of_interior(i,j+1),y_coor_interior(i,j),y_coor_interior(i+1,j),y_coor_interior(i+1,j+1),y_coor_interior(i,j+1));
+        end
+    end
+    
+end
+
+%function to get X-coordinate of the interior of the fan mesh on middle side.
+
+function GetXCoordinateMiddle(Df,Lf, Nlf,Ndf, y_coor_of_left_incl_line, x_coor_of_right_incl_line, x_coor_of_footing_base, x_coor_of_footing_edge_for_below, x_coor_of_fan_base, y_coor_of_footing_edge_for_below,y_coor_of_fan_base)
+    y_coor_of_left_incl_line(Ndf) = -Df;
+    
+    for i=1:Nlf
+        eqn = polyfit([x_coor_of_footing_edge_for_below(i),x_coor_of_fan_base(i)],[y_coor_of_footing_edge_for_below(i),y_coor_of_fan_base(i)],1);
+        m=eqn(1);
+        c=eqn(2);
+        x_interior(1,:)=(y_coor_of_left_incl_line - c)/m;
+    end
+    disp(x_interior);
+
+
+
+end
 
 function generateMesh (B,L,D,Nd,Nb)
     %Horizontal boundary
