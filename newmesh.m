@@ -1,26 +1,27 @@
 clc;
 clear all;
 
-%All inputs
-B = 2.5;
-L = 10;
-D = 10;
-Nd = 3;
-Nb = 3;
-
 %Inputs for fan mesh
 Lf = 5; % length of fan base
-Nlf = 3; % division of fan base
+Nlf = 30; % division of fan base
 Df = 5; %Depth of fan mesh
-Ndf = 3 ; % division of fan dept(left an right)
+Ndf = 25 ; % division of fan dept(left an right)
+
+%All inputs
+B = 2.5;
+D = 8;
+x = (D*(Lf-B))/(Lf*Df)+1;
+L = x*Lf;
+Nd = 30; %division for symmetric boundary in main mesh
+Nb = 30; %division for fan mesh right of footing or rectangular division
 
 %Function call
 
     %generateMesh(B,L,D,Nd,Nb);
-    generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb)
+    generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd)
 
 %function to genrate fan mesh
-function generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb)
+function generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd)
     
     y_coor_of_symm_side = linspace(0,-Df,Ndf+1); 
     y_coor_of_footing_edge_side = zeros(size(y_coor_of_symm_side)); % footing edge y-coor to connect to the symm side to draw radial lines
@@ -38,8 +39,8 @@ function generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb)
     plot([x_coor_of_footing_edge_for_below;x_coor_of_fan_base],[y_coor_of_footing_edge_for_below;y_coor_of_fan_base],'k-');
     
     %for drawing inclined lines on right side
-    y_coor_of_rightside_fan = linspace(0,-Df,Ndf+1);
-    x_coor_of_rightside_fan = Lf*ones(size(y_coor_of_rightside_fan));
+    y_coor_of_rightside_fan = linspace(0,-(Df+D),Ndf+1);
+    x_coor_of_rightside_fan = L*ones(size(y_coor_of_rightside_fan));
     plot([x_coor_of_footing_edge_side;x_coor_of_rightside_fan],[y_coor_of_footing_edge_side;y_coor_of_rightside_fan],'k-');
     
     %for drawaing rectangular lines
@@ -53,16 +54,101 @@ function generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb)
     m_right = eqn_of_right_incl_line(1); c_right = eqn_of_right_incl_line(2);
     
     y_coor_of_left_incl_line = m_left*x_coor_of_footing_base + c_left;
+    
     x_coor_of_right_incl_line = (y_coor_of_left_incl_line - c_right)/m_right;
     y_coor_of_footing_right = zeros(size(x_coor_of_right_incl_line));
     
     plot([x_coor_of_footing_base;x_coor_of_footing_base;x_coor_of_right_incl_line;x_coor_of_right_incl_line],[y_coor_of_footing_base;y_coor_of_left_incl_line;y_coor_of_left_incl_line;y_coor_of_footing_right],'k-');
+    plot([0;0;Lf;Lf],[0;-Df;-Df;0],'k-');
     grid on;
     
     GetYCoordinateLeftRight(Nb,B,Ndf,Df,x_coor_of_footing_base,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,y_coor_of_symm_side,x_coor_of_symm_side,y_coor_of_left_incl_line);
-    GetXCoordinateMiddle(Df,Lf, Nlf,Ndf, y_coor_of_left_incl_line, x_coor_of_right_incl_line, x_coor_of_footing_base,x_coor_of_footing_edge_for_below,x_coor_of_fan_base,y_coor_of_footing_edge_for_below,y_coor_of_fan_base);
+    GetXCoordinateMiddle(Nb,Df,Lf, Nlf, y_coor_of_left_incl_line, x_coor_of_right_incl_line,x_coor_of_footing_edge_for_below,x_coor_of_fan_base,y_coor_of_footing_edge_for_below,y_coor_of_fan_base);
+    GenerateMainMesh(B,Nlf,Ndf,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd);
+    GetYCoordinate_For_Right_mesh(Nb,Nd,B,L,D,Df,Ndf,x_coor_of_right_incl_line,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,x_coor_of_rightside_fan,y_coor_of_rightside_fan,y_coor_of_left_incl_line);
+end
+
+%%function to generate Main mesh
+%% 
+function GenerateMainMesh(B,Nlf,Ndf,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd)
+    x_coor_of_boundary_base = linspace(0,L,Nlf+1);
+    y_coor_of_boundary_base = -(Df+D)*ones(size(x_coor_of_boundary_base));
+    plot([x_coor_of_fan_base;x_coor_of_boundary_base],[y_coor_of_fan_base;y_coor_of_boundary_base],'k-');
+    
+    %To draw the rectangular lines in main mesh
+    y_coor_of_symm_side = linspace(-Df,-(Df+D),Nd+1);
+    y_coor_of_symm_side(1)=[];
+    x_coor_of_symm_side = zeros(size(y_coor_of_symm_side));
+    y_coor_right_of_footing = zeros(size(y_coor_of_symm_side));
+
+    eqn_of_right_incl_line=polyfit([B,L],[0,-(Df+D)],1);
+    m=eqn_of_right_incl_line(1); c=eqn_of_right_incl_line(2);
+    x_coor_of_right_symm_line = (y_coor_of_symm_side-c)/m;
+    plot([x_coor_of_symm_side;x_coor_of_right_symm_line;x_coor_of_right_symm_line],[y_coor_of_symm_side;y_coor_of_symm_side;y_coor_right_of_footing],'k-');
+
+     GetXCoordinateForMainMeshBelow(Lf,Nlf, x_coor_of_fan_base, x_coor_of_boundary_base, y_coor_of_symm_side, D,Df, x_coor_of_symm_side, Nd, x_coor_of_right_symm_line)
+    %disp(x_int_belowbase);
+end
+%% 
+function  GetXCoordinateForMainMeshBelow(Lf,Nlf, x_coor_of_fan_base, x_coor_of_boundary_base, y_coor_of_symm_side, D,Df, x_coor_of_symm_side, Nd, x_coor_of_right_symm_line)
+    y_coor_of_fan_base = -Df*ones(size(x_coor_of_fan_base));
+    y_coor_of_boundary_base = -(Df+D)*ones(size(y_coor_of_fan_base));
+    for i=1:Nlf
+        eqn = polyfit([x_coor_of_fan_base(i),x_coor_of_boundary_base(i)],[y_coor_of_fan_base(i),y_coor_of_boundary_base(i)],1);
+        m=eqn(1);
+        c=eqn(2);
+        x_coor_int(i,:)=(y_coor_of_symm_side-c)/m;
+    end
+    x_coor_int(1,:)=[];
+    x_coor_int = x_coor_int';
+    x_coor_of_fan_base([1,Nlf+1])=[];
+    x_coor_of_symm_side=[0,x_coor_of_symm_side];
+    x_coor_of_right_symm_line=[Lf,x_coor_of_right_symm_line];
+    x_coor_int = [x_coor_of_fan_base;x_coor_int];
+    x_coor_int = [x_coor_of_symm_side',x_coor_int,x_coor_of_right_symm_line'];
+    
+    y_coor_of_symm_side=[-Df,y_coor_of_symm_side];
+    
+    y_coor_int = repmat(y_coor_of_symm_side',1,Nlf+1);
+    
+    
+    for i=1:Nd
+        for j=1:Nlf
+            Divide_Quadri(x_coor_int(i,j),x_coor_int(i+1,j),x_coor_int(i+1,j+1),x_coor_int(i,j+1),y_coor_int(i,j),y_coor_int(i+1,j),y_coor_int(i+1,j+1),y_coor_int(i,j+1));
+        end
+    end
 
 end
+
+%% function to get the Y_coord of the right side mesh
+function GetYCoordinate_For_Right_mesh(Nb,Nd,B,L,D,Df,Ndf,x_coor_of_right_incl_line,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,x_coor_of_rightside_fan,y_coor_of_rightside_fan,y_coor_of_left_incl_line)
+    eqn_of_right_inclined_line = polyfit([B,L],[0,-(D+Df)],1);
+    y_coor_of_left_incl_line = flip(y_coor_of_left_incl_line);
+    y_sym_main_mesh = linspace(-Df,-(D+Df),Nd+1);
+    y_coor_right_incl_line = [y_coor_of_left_incl_line,y_sym_main_mesh];
+    m_inclined = eqn_of_right_inclined_line(1); c_inclined=eqn_of_right_inclined_line(2);
+    x_coor_of_right_incl_line = (y_coor_right_incl_line - c_inclined)/m_inclined;
+    
+
+    for i=1:Ndf
+        eqn=polyfit([x_coor_of_footing_edge_side(i),x_coor_of_rightside_fan(i)],[y_coor_of_footing_edge_side(i),y_coor_of_rightside_fan(i)],1);
+        m=eqn(1);
+        c=eqn(2);
+        y_coor_int(i,:) = m*x_coor_of_right_incl_line + c;
+    end
+    y_coor_int = [y_coor_int;y_coor_right_incl_line];
+    x_coor_int = repmat(x_coor_of_right_incl_line,Ndf+1,1);
+   
+    for i=1:Ndf
+        for j=1:Nb+Nd-1
+            Divide_Quadri(x_coor_int(i,j),x_coor_int(i+1,j),x_coor_int(i+1,j+1),x_coor_int(i,j+1),y_coor_int(i,j),y_coor_int(i+1,j),y_coor_int(i+1,j+1),y_coor_int(i,j+1));
+        end
+    end
+end
+
+ 
+
+%% 
 
 %function to get Y-coordinate of the interior of the fan mesh on right side.
 
@@ -111,16 +197,27 @@ end
 
 %function to get X-coordinate of the interior of the fan mesh on middle side.
 
-function GetXCoordinateMiddle(Df,Lf, Nlf,Ndf, y_coor_of_left_incl_line, x_coor_of_right_incl_line, x_coor_of_footing_base, x_coor_of_footing_edge_for_below, x_coor_of_fan_base, y_coor_of_footing_edge_for_below,y_coor_of_fan_base)
-    y_coor_of_left_incl_line(Ndf) = -Df;
-    
+function GetXCoordinateMiddle(Nb,Df,Lf, Nlf, y_coor_of_left_incl_line, x_coor_of_right_incl_line,  x_coor_of_footing_edge_for_below, x_coor_of_fan_base, y_coor_of_footing_edge_for_below,y_coor_of_fan_base)
+    y_coor_of_left_incl_line = [-Df,y_coor_of_left_incl_line];
+    x_coor_of_right_incl_line = [Lf,x_coor_of_right_incl_line];
+    %disp(y_coor_of_left_incl_line);
     for i=1:Nlf
         eqn = polyfit([x_coor_of_footing_edge_for_below(i),x_coor_of_fan_base(i)],[y_coor_of_footing_edge_for_below(i),y_coor_of_fan_base(i)],1);
         m=eqn(1);
         c=eqn(2);
-        x_interior(1,:)=(y_coor_of_left_incl_line - c)/m;
+        x_interior(i,:)=(y_coor_of_left_incl_line - c)/m;
     end
-    disp(x_interior);
+    x_interior=[x_interior;x_coor_of_right_incl_line];
+   
+    y_interior = repmat(y_coor_of_left_incl_line,Nlf+1,1);
+    
+    for i=1:Nlf
+        for j=1:Nb-1
+            Divide_Quadri(x_interior(i,j),x_interior(i+1,j),x_interior(i+1,j+1),x_interior(i,j+1),y_interior(i,j),y_interior(i+1,j),y_interior(i+1,j+1),y_interior(i,j+1));
+        end
+
+    end
+    
 
 
 
@@ -170,49 +267,6 @@ function generateMesh (B,L,D,Nd,Nb)
 
 end
 
-function [x_int_belowbase] = GetXCoordinatesBelowFooting(Nd, x_Footing_base, x_H_boundarybase, y_symmetric_boundary, D, x_symmetric_boundary, Nb, x_top_boundary)
-
-    %Trimming first and last values of arrays as we already have those
-    %coordinates
-    
-    y_symmetric_boundary([1,Nd+1])=[];
-    x_Footing_base([1,Nd+1])=[];
-    x_H_boundarybase([1,Nd+1])=[];
-    
-    for i = 1:Nd-1
-        
-        X = [x_Footing_base(i), x_H_boundarybase(i)];
-        Y = [0, -D];
-
-        coefficient = polyfit(X, Y, 1);
-
-        m = coefficient(1);
-        c = coefficient(2);
-        x_int_belowbase(:,i) = (y_symmetric_boundary - c)/m; % x-coord of intersection points below footing base
-        
-        %Each column = Inclined line from left
-        %Each row = Horizontal line from top
-        %Ex: 3,2 = 3rd horizontal line intersecting with 2nd inclined line
-    end
-    
-    x_symmetric_boundary = x_symmetric_boundary';
-    all =[x_Footing_base;x_int_belowbase;x_H_boundarybase];
-    All_x_below_base=[x_symmetric_boundary all x_top_boundary'];
-    
-    y_symmetric_boundary = [0; y_symmetric_boundary'; -D];
-    All_y_below_base = repmat(y_symmetric_boundary, 1, Nd+1);
-    % disp(All_y_below_base);
-    % disp(All_x_below_base);
-    
-    for i=1:Nb
-        for j=1:Nd
-              [x_coord,y_coord]=  Divide_Quadri (All_x_below_base(i,j),All_x_below_base(i+1,j),All_x_below_base(i+1,j+1),All_x_below_base(i,j+1),All_y_below_base(i,j),All_y_below_base(i+1,j),All_y_below_base(i+1,j+1),All_y_below_base(i,j+1));
-             
-        end
-    end
-    
-    
-end
 
 function [y_int_right_base] = GetYCoordinatesRightOfFooting(Nd,B,L,V_boundarybase,x_top_boundary,Nb)
     
