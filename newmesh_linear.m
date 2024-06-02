@@ -22,8 +22,6 @@ r=2;
 %Function call
 
    total_node_table = generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd,r);
-   [x_coords, ~] = divide_line_gp(0, 0, 4, 0, 3, 2);
-   disp (x_coords);
 
 %% function to genrate fan mesh
 function [total_node_table] = generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd,r)
@@ -50,11 +48,8 @@ function [total_node_table] = generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd,r)
     plot([x_coor_of_footing_edge_side;x_coor_of_rightside_fan],[y_coor_of_footing_edge_side;y_coor_of_rightside_fan],'k-');
     
     %for drawaing rectangular lines
-    [x_coords,~]= divide_line_gp(0, 0, (B+D), 0, (Nb+Nd), r);
-    y_coor_of_symm_side = -1*x_coords(Nb+1:end);
-    disp(y_)
-    %x_coor_of_footing_base = linspace(0, B, Nb+1);
-    x_coor_of_footing_base = x_coords(1:Nb+1);
+    %[x_coords,~]= divide_line_gp(B, 0, 0, 0, Nb, r);
+    x_coor_of_footing_base = linspace(0, B, Nb+1);
     x_coor_of_footing_base([1,Nb+1])=[];
     y_coor_of_footing_base = zeros(size(x_coor_of_footing_base));
     
@@ -68,27 +63,27 @@ function [total_node_table] = generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd,r)
     x_coor_of_right_incl_line = (y_coor_of_left_incl_line - c_right)/m_right;
     y_coor_of_footing_right = zeros(size(x_coor_of_right_incl_line));
     
-    plot([x_coor_of_footing_base;x_coor_of_footing_base;x_coor_of_right_incl_line;x_coor_of_right_incl_line],[y_coor_of_footing_base;y_coor_of_left_incl_line;y_coor_of_left_incl_line;y_coor_of_footing_right],'r-');
-    plot([0;0;Lf;Lf],[0;-Df;-Df;0],'g-');
+    plot([x_coor_of_footing_base;x_coor_of_footing_base;x_coor_of_right_incl_line;x_coor_of_right_incl_line],[y_coor_of_footing_base;y_coor_of_left_incl_line;y_coor_of_left_incl_line;y_coor_of_footing_right],'k-');
+    plot([0;0;Lf;Lf],[0;-Df;-Df;0],'k-');
     grid on;
     
     [node_left_fan_total] = GetYCoordinateLeftRight(Nb,B,Ndf,Df,x_coor_of_footing_base,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,y_coor_of_symm_side,x_coor_of_symm_side,y_coor_of_left_incl_line,r);
     [node_middle_fan] = GetXCoordinateMiddle(B, Nb,Df,Lf, Nlf, y_coor_of_left_incl_line, x_coor_of_right_incl_line,x_coor_of_footing_edge_for_below,x_coor_of_fan_base,y_coor_of_footing_edge_for_below,y_coor_of_fan_base);
-    [node_middle_main] = GenerateMainMesh(B,Nlf,Ndf,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd,r,Nb);
+    [node_middle_main] = GenerateMainMesh(B,Nlf,Ndf,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd,r);
     [node_right_side] = GetYCoordinate_For_Right_mesh(Nb,Nd,B,L,D,Df,Ndf,x_coor_of_right_incl_line,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,x_coor_of_rightside_fan,y_coor_of_rightside_fan,y_coor_of_left_incl_line,r);
 
     total_node_table = [node_left_fan_total; node_middle_main;node_middle_fan; node_right_side];
 end
 
 %% function to generate Main mesh 
-function [node_middle_main] = GenerateMainMesh(B,Nlf,Ndf,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd,r,Nb)
- 
+function [node_middle_main] = GenerateMainMesh(B,Nlf,Ndf,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd,r)
+    %[x_coords,~]= divide_line_gp(0, -(Df+D), L, -(Df+D), Nlf, r);
     x_coor_of_boundary_base = linspace(0, L, Nlf+1);
     y_coor_of_boundary_base = -(Df+D)*ones(size(x_coor_of_boundary_base));
     plot([x_coor_of_fan_base;x_coor_of_boundary_base],[y_coor_of_fan_base;y_coor_of_boundary_base],'k-');
     
     %To draw the rectangular lines in main mesh
-    [~,y_coords]= divide_line_gp(0, -Df, 0, -(Df+D), Nd+Nb, r);
+    %[~,y_coords]= divide_line_gp(0, -Df, 0, -(Df+D), Nd, r);
     y_coor_of_symm_side = linspace(-Df, -(Df+D), Nd+1);
     y_coor_of_symm_side(1)=[];
     x_coor_of_symm_side = zeros(size(y_coor_of_symm_side));
@@ -363,29 +358,18 @@ function [node_right_fan] = getNodes_right(B,x_coor_of_interior, y_coor_interior
         end
     end
 end
+
 %% Function for G.P series
-function [x_coords,y_coords] = divide_line_gp(x0, y0, x1, y1, Nb, r, Nd)
+function [x_coords,y_coords]= divide_line_gp(x0, y0, x1, y1, n, r)
     % Length of the line segment
     L = sqrt((x1 - x0)^2 + (y1 - y0)^2);
     
     % Calculate the first term 'a' of the GP
-    flag = 0;
-    if nargin < 7
-        
-        flag = 1; % Default behavior is to sum from a to a*r^n-1
-    
-    end
-
-    if flag == 1
-        a = L * (r - 1) / (r^Nb - 1);
-    else 
-        a = (L*(r-1))/((r^Nd - 1) * r^Nb);
-        disp(a);
-    end
+    a = L * (r - 1) / (r^n - 1);
     
     % Initialize arrays to store the coordinates
-    x_coords = zeros(1, Nb+1);
-    y_coords = zeros(1, Nb+1);
+    x_coords = zeros(1, n+1);
+    y_coords = zeros(1, n+1);
     
     % Set the starting point
     x_coords(1) = x0;
@@ -393,24 +377,13 @@ function [x_coords,y_coords] = divide_line_gp(x0, y0, x1, y1, Nb, r, Nd)
     
     % Calculate the cumulative distance along the line
     cumulative_distance = 0;
-    if flag == 1
-        for k = 1:Nb
-            segment_length = a * r^(k-1);
-            cumulative_distance = cumulative_distance + segment_length;
-            
-            % Calculate the coordinates of the k-th division point
-            x_coords(k+1) = x0 + (cumulative_distance / L) * (x1 - x0);
-            y_coords(k+1) = y0 + (cumulative_distance / L) * (y1 - y0);
-        end
-    else
-        for k = 1:Nd+Nb
-            segment_length = a * r^(k-1);
-            cumulative_distance = cumulative_distance + segment_length;
-            
-            % Calculate the coordinates of the k-th division point
-            x_coords(k+1) = x0 + (cumulative_distance / L) * (x1 - x0);
-            y_coords(k+1) = y0 + (cumulative_distance / L) * (y1 - y0);
-        end
+    for k = 1:n
+        segment_length = a * r^(k-1);
+        cumulative_distance = cumulative_distance + segment_length;
+        
+        % Calculate the coordinates of the k-th division point
+        x_coords(k+1) = x0 + (cumulative_distance / L) * (x1 - x0);
+        y_coords(k+1) = y0 + (cumulative_distance / L) * (y1 - y0);
     end
 end
 
