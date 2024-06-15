@@ -2,28 +2,28 @@ clc;
 clear all;
 close all;
 
+
+B = 2.5;
 %Inputs for fan mesh
-B = 1;
-Lf = 5*B; % length of fan base
-Nlf = 10; % division of fan base
-Df = B; %Depth of fan mesh
-Ndf = Nlf ; % division of fan dept(left and right)
-L = 8*B;
+Lf = 2*B; % length of fan base
+Nlf = 3; % division of fan base
+Df = Lf; %Depth of fan mesh
+Ndf = 3 ; % division of fan dept(left an right)
 
 %All inputs
-D = 5*B;
-%x = (D*(Lf-B))/(Lf*Df)+1;
-Lf=Df*(L-B)/(Df+D) + B;
-%L = x*Lf;
-Nb = 0.7*Ndf; %division for fan mesh right of footing or rectangular division
-Nd = 5*Nb; %division for symmetric boundary in main mesh
+
+D = 8;
+x = (D*(Lf-B))/(Lf*Df)+1;
+L = x*Lf;
+Nd = 3; %division for symmetric boundary in main mesh
+Nb = 3; %division for fan mesh right of footing or rectangular division
 r=2;
 
-%Function call
 
-   total_node_table = generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd,r);
-   [x_coords, ~] = divide_line_gp(0, 0, 4, 0, 3, 2);
-   disp (x_coords);
+%% Function call
+
+   generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd,r);
+   
 
 %% function to genrate fan mesh
 function [total_node_table] = generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd,r)
@@ -49,47 +49,58 @@ function [total_node_table] = generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd,r)
     x_coor_of_rightside_fan = L*ones(size(y_coor_of_rightside_fan));
     plot([x_coor_of_footing_edge_side;x_coor_of_rightside_fan],[y_coor_of_footing_edge_side;y_coor_of_rightside_fan],'k-');
     
-    %for drawaing rectangular lines
-    [x_coords,~]= divide_line_gp(0, 0, (B+D), 0, (Nb+Nd), r);
-    y_coor_of_symm_side = -1*x_coords(Nb+1:end);
-    disp(y_)
-    %x_coor_of_footing_base = linspace(0, B, Nb+1);
-    x_coor_of_footing_base = x_coords(1:Nb+1);
-    x_coor_of_footing_base([1,Nb+1])=[];
-    y_coor_of_footing_base = zeros(size(x_coor_of_footing_base));
+    %for drawing rectangular lines
+    [x_coords,~]= divide_line_gp(B, 0, L, 0, (Nd), r);
+    disp(x_coords);
+    count=0;
+    disp(Lf);
+    for i=1:size(x_coords)
+        if(x_coords(i)<=Lf)
+            count = count +1;
+        end
+        
+    end
+    disp(count);
+    x_coor_of_right_surface_for_fan = x_coords(1:count);
+    x_coor_of_right_surface_for_main = x_coords(count:end);
+    %x_coor_of_footing_base([1,Nb+1])=[];
+    %y_coor_of_footing_base = zeros(size(x_coor_of_footing_base));
     
     eqn_of_left_incl_line = polyfit([B,0],[0,-Df],1);
     eqn_of_right_incl_line = polyfit([B,Lf],[0,-Df],1);
     m_left=eqn_of_left_incl_line(1); c_left=eqn_of_left_incl_line(2);
     m_right = eqn_of_right_incl_line(1); c_right = eqn_of_right_incl_line(2);
     
-    y_coor_of_left_incl_line = m_left*x_coor_of_footing_base + c_left;
-    
-    x_coor_of_right_incl_line = (y_coor_of_left_incl_line - c_right)/m_right;
+    %y_coor_of_left_incl_line = m_left*x_coor_of_footing_base + c_left;
+    y_coor_of_right_incl_line = m_right * x_coor_of_right_surface_for_fan + c_right;
+    y_coor_of_left_incl_line = y_coor_of_right_incl_line;
+    x_coor_of_footing_base = (y_coor_of_left_incl_line - c_left)/m_left;
+    x_coor_of_right_incl_line = x_coor_of_right_surface_for_fan;
     y_coor_of_footing_right = zeros(size(x_coor_of_right_incl_line));
-    
+    y_coor_of_footing_base = zeros(size(x_coor_of_footing_base));
+
     plot([x_coor_of_footing_base;x_coor_of_footing_base;x_coor_of_right_incl_line;x_coor_of_right_incl_line],[y_coor_of_footing_base;y_coor_of_left_incl_line;y_coor_of_left_incl_line;y_coor_of_footing_right],'r-');
     plot([0;0;Lf;Lf],[0;-Df;-Df;0],'g-');
     grid on;
     
-    [node_left_fan_total] = GetYCoordinateLeftRight(Nb,B,Ndf,Df,x_coor_of_footing_base,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,y_coor_of_symm_side,x_coor_of_symm_side,y_coor_of_left_incl_line,r);
-    [node_middle_fan] = GetXCoordinateMiddle(B, Nb,Df,Lf, Nlf, y_coor_of_left_incl_line, x_coor_of_right_incl_line,x_coor_of_footing_edge_for_below,x_coor_of_fan_base,y_coor_of_footing_edge_for_below,y_coor_of_fan_base);
-    [node_middle_main] = GenerateMainMesh(B,Nlf,Ndf,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd,r,Nb);
-    [node_right_side] = GetYCoordinate_For_Right_mesh(Nb,Nd,B,L,D,Df,Ndf,x_coor_of_right_incl_line,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,x_coor_of_rightside_fan,y_coor_of_rightside_fan,y_coor_of_left_incl_line,r);
+    % [node_left_fan_total] = GetYCoordinateLeftRight(Nb,B,Ndf,Df,x_coor_of_footing_base,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,y_coor_of_symm_side,x_coor_of_symm_side,y_coor_of_left_incl_line,r);
+    % [node_middle_fan] = GetXCoordinateMiddle(B, Nb,Df,Lf, Nlf, y_coor_of_left_incl_line, x_coor_of_right_incl_line,x_coor_of_footing_edge_for_below,x_coor_of_fan_base,y_coor_of_footing_edge_for_below,y_coor_of_fan_base);
+    % [node_middle_main] = GenerateMainMesh(B,Nlf,Ndf,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd,r,Nb,y_coor_of_symm_side);
+    % [node_right_side] = GetYCoordinate_For_Right_mesh(Nb,Nd,B,L,D,Df,Ndf,x_coor_of_right_incl_line,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,x_coor_of_rightside_fan,y_coor_of_rightside_fan,y_coor_of_left_incl_line,r);
 
-    total_node_table = [node_left_fan_total; node_middle_main;node_middle_fan; node_right_side];
+    %total_node_table = [node_left_fan_total; node_middle_main;node_middle_fan; node_right_side];
 end
 
 %% function to generate Main mesh 
-function [node_middle_main] = GenerateMainMesh(B,Nlf,Ndf,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd,r,Nb)
+function [node_middle_main] = GenerateMainMesh(B,Nlf,Ndf,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd,r,Nb,y_coor_of_symm_side)
  
     x_coor_of_boundary_base = linspace(0, L, Nlf+1);
     y_coor_of_boundary_base = -(Df+D)*ones(size(x_coor_of_boundary_base));
     plot([x_coor_of_fan_base;x_coor_of_boundary_base],[y_coor_of_fan_base;y_coor_of_boundary_base],'k-');
     
     %To draw the rectangular lines in main mesh
-    [~,y_coords]= divide_line_gp(0, -Df, 0, -(Df+D), Nd+Nb, r);
-    y_coor_of_symm_side = linspace(-Df, -(Df+D), Nd+1);
+    %[~,y_coords]= divide_line_gp(0, -Df, 0, -(Df+D), Nd+Nb, r);
+   % y_coor_of_symm_side = linspace(-Df, -(Df+D), Nd+1);
     y_coor_of_symm_side(1)=[];
     x_coor_of_symm_side = zeros(size(y_coor_of_symm_side));
     y_coor_right_of_footing = zeros(size(y_coor_of_symm_side));
@@ -176,6 +187,8 @@ end
 %% Function to get Y-coordinate of the interior of the fan mesh on left side
 
 function [node_left_fan_total] = GetYCoordinateLeftRight(Nb,B,Ndf,Df,x_coor_of_footing_base,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,y_coor_of_symm_side,x_coor_of_symm_side,y_coor_of_left_incl_line,r)
+    y_full = y_coor_of_symm_side;
+    
     x_coor_of_footing_base=[x_coor_of_footing_base,B];
     x_coor_of_interior = repmat(x_coor_of_footing_base,Ndf+1,1);
     x_coor_of_interior = [x_coor_of_symm_side',x_coor_of_interior];
@@ -202,8 +215,9 @@ function [node_left_fan_total] = GetYCoordinateLeftRight(Nb,B,Ndf,Df,x_coor_of_f
     y_coor_int_size = size(y_coor_interior);
 
     %[~,y_coords]= divide_line_gp(0, 0, 0, -Df, Ndf, r);
-    y_coor_symm_side = linspace(0, -Df, Ndf+1);
-    
+    y_coor_symm_side = y_full;
+    disp(size(y_coor_symm_side));
+    disp(size(y_coor_interior));
     y_coor_interior=[y_coor_symm_side',y_coor_interior];
     y_coor_interior(:,y_coor_size(2)+1)=[];
     
