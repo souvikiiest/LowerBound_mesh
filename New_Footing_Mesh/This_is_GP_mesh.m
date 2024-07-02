@@ -1,10 +1,11 @@
 close all;
 clear all;
+warning('off','all');
 
 %Inputs for fan mesh
-Nlf = 2; % division of fan base
+Nlf = 7; % division of fan base
 %Depth of fan mesh
-Ndf = Nlf ; % division of fan dept(left an right)
+Ndf = Nlf; % division of fan dept(left an right)
 
 %All inputs
 B = 1;
@@ -13,11 +14,11 @@ D = 10*B;
 L = 10*B; %Total extent of boundary
 Lf = Df*(L-B)/(Df+D) + B; % length of fan base
 
-Nd = 2*Nlf; %division for symmetric boundary in main mesh
-Nb = Nlf; %division for fan mesh right of footing or rectangular division
+Nd = 2*Nlf; %division for symmetric boundary in main mesh 2*Nlf %causing problem in mesh for 16,10
+Nb = Nlf; %division for fan mesh right of footing or rectangular division Nlf
 
 p=24; %for yield function
-fi=30;
+fi=25;
 c=0.0001;
 gamma=18;
 tic;
@@ -46,11 +47,31 @@ B2 = [B_element;B_discontinuity;B_Boundary];
 A1 = A_Yield;
 B1 = B_yield;
 
-f=C_matrix';
-%options = optimset('MaxIter',1000000,'Display','final','TolFun',1e-3,'TolX',1e-3);
-[solution,fval,exitflag,output]=linprog(f,A1,B1,A2,B2);
+f=full(C_matrix');
+%% using gurobi
+% A=[A1;A2];
+% b=[B1;B2];
+% model.A = sparse(A);
+% model.obj = -f;
+% model.rhs = full(b);
+% model.sense = [repmat('<', size(A1,1),1); repmat('=', size(A2,1),1)];
+% model.modelsense ='min';
+% params.outputflag = 0;
+% params.Threads = 4;
+% params.Method = 1;
+% result = gurobi(model,params);
+% solution = result.x;
+% fval = result.objval;
+
+%% using linprog
+
+ %options = optimset('MaxIter',10000000,'Display','final','TolFun',1e-3,'TolX',1e-3);
+ [solution,fval,exitflag,output]=linprog(f,A1,B1,A2,B2); %,[],[],options
+
+ %% Display results
+
 N_c= -fval/(c*B);
-N_g = -(fval*2)/(gamma*B*B);
+N_g = -(fval)/(gamma*B*B);
 N_q = -(fval);
 fprintf("p = %d, c = %d, fi = %d \n",p,c,fi);
 disp("Collapse Load: "+ -fval);
@@ -492,7 +513,7 @@ end
 
 %% Boundary condition
 function [A_bound,B_Boundary] = BoundaryCondition(left_bound_result,middle_bound_result,right_bound_result,no_of_element)
-    row = size(left_bound_result,1)+2*size(right_bound_result,1)+size(middle_bound_result,1);
+    row = size(left_bound_result,1)+size(middle_bound_result,1)+2*size(right_bound_result,1); %+size(middle_bound_result,1)
     col = 9*no_of_element;
     A_bound =sparse(row,col);
     % for right boundary theta=0
@@ -532,7 +553,7 @@ function [A_bound,B_Boundary] = BoundaryCondition(left_bound_result,middle_bound
     end 
     
      B_Boundary_right(b_counter-1,1)=0;
-     B_Boundary=[B_Boundary_left;B_Boundary_middle;B_Boundary_right];
+     B_Boundary=[B_Boundary_left;B_Boundary_middle;B_Boundary_right]; % ;B_Boundary_middle
     
 end
 
@@ -613,10 +634,20 @@ function [left_bound_result,right_bound_result,middle_bound_result] = findConsec
     middle_bound_result(size_midd_bound-3,:)=[];
     middle_bound_result(size_midd_bound-2,:)=[];
 
+    %reshape the middle bound result so that nodes come in order.
+% nodeNumbers = middle_bound_result(:, 1);
+% reshapedNodeNumbers = reshape(nodeNumbers, 2, []).';
+% reversedPairsNodeNumbers = flipud(reshapedNodeNumbers);
+% reorderedNodeNumbers = reshape(reversedPairsNodeNumbers.', [], 1);
+% [~, newOrder] = ismember(reorderedNodeNumbers, nodeNumbers);
+% reorderedArray = middle_bound_result(newOrder, :);
+% middle_bound_result = reorderedArray;
+
+
 end
 
 %% function to find discontinuity edges
-function [result,new_node] = findMatchingEdges(nodes_array)
+function [result,new_node] = findMatchingEdges(nodes_array) %nodes_array same as total_node_table
 result = [];
 n = size(nodes_array, 1);
 new_node=[];
@@ -626,13 +657,13 @@ new_nodes_array = [index_array,nodes_array];
 i=1;
 while i<n-1
     triangle = new_nodes_array(i:i+2,:);
-    new_node = [new_node;triangle;triangle(1,:)];
+    new_node = [new_node;triangle;triangle(1,:)]; %repeats first triangle node at the end
     i=i+3;
 end
 
 n = size(new_node, 1);
 for i = 1:n
-    if mod(i,4)==0
+    if mod(i,4)==0  %skips first node repeatition (of first element) with next element
         continue;
     end
     x1 = new_node(i, 2);
@@ -640,7 +671,7 @@ for i = 1:n
     x2 = new_node(i+1, 2);
     y2 = new_node(i+1, 3);
     %
-    if ~(x1 == 0 && x2 == 0) || ~(y1 == 0 && y2 == 0)
+    if ~(x1 == 0 && x2 == 0) || ~(y1 == 0 && y2 == 0) %skips boundary edges
         
         for j = i+2:n-1
             x3 = new_node(j, 2);
@@ -648,7 +679,7 @@ for i = 1:n
             x4 = new_node(j+1, 2);
             y4 = new_node(j+1, 3);
             if new_node(j,1) ~= new_node(i,1) && new_node(j,1) ~= new_node(i+1,1) && ...
-                   new_node(j+1,1) ~= new_node(i,1) && new_node(j+1,1) ~= new_node(i+1,1)
+                   new_node(j+1,1) ~= new_node(i,1) && new_node(j+1,1) ~= new_node(i+1,1) %prevent same node number for comparison
                 
                 if (x1 ==x3 && y1 == y3 && x2==x4 && y2==y4) || ...
                     (x1==x4 && y1==y4 && x2==x3 && y2==y3)
