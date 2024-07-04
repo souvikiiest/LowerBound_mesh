@@ -1,31 +1,42 @@
 close all;
 clear all;
 warning('off','all');
-
+% fi=[5,10,15,20,25,30,35,40,45];
+% N_g_arr=[];
+% for i=1:9
+%     N_g = main(fi(i));
+%     N_g_arr(i) = N_g;
+%     disp(N_g_arr(i));
+% end
+% function N_g = main(phi)
 %Inputs for fan mesh
-Nlf = 7; % division of fan base
+
+Nlf = 5; % division of fan base 5
 %Depth of fan mesh
-Ndf = Nlf; % division of fan dept(left an right)
+Ndf = 6; % division of fan dept(left) 3
 
 %All inputs
-B = 1;
-Df = 1.5*B;
-D = 10*B;
-L = 10*B; %Total extent of boundary
+B = 0.5;
+D = 12*B;
+L = 20*B; %Total extent of boundary
+%Df = (B*(1+D)/(1-B))-L; %Depth of fan mesh
+Df=1*B;
 Lf = Df*(L-B)/(Df+D) + B; % length of fan base
 
-Nd = 2*Nlf; %division for symmetric boundary in main mesh 2*Nlf %causing problem in mesh for 16,10
-Nb = Nlf; %division for fan mesh right of footing or rectangular division Nlf
+Nd = 15; %division for recatangular/symmetric  in main mesh 2*Nlf 
+Nb = 10; %division for rectangular division in fan mesh Nlf 3
+Nrf = Ndf; %division for right side lines 
 
-p=24; %for yield function
-fi=25;
-c=0.0001;
-gamma=18;
+p=36; %for yield function
+fi=0;
+c=20;
+gamma=0;
 tic;
 %% Function call
-[total_node_table,no_of_element]=generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd);
+[total_node_table,no_of_element]=generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd,Nrf);
 total_node_table = round(total_node_table,3);
-
+ElemX = total_node_table(:,1);
+ElemY = total_node_table(:,2);
 [result,new_node] = findMatchingEdges(total_node_table); %result has the discontinuity planes with angles
 [left_bound_result,right_bound_result,middle_bound_result] = findConsecutiveNodes(total_node_table, B);
 [A_element,B_element, A_Yield, B_yield,A_bound,B_Boundary,A_discontinuity,B_discontinuity,C_matrix] = ...
@@ -34,7 +45,7 @@ total_node_table = round(total_node_table,3);
 
 %% This are some checking function to verify nodes,boundary
  %labelTriangles(total_node_table);
- %plotNodesWithNumbersInside(total_node_table);
+ % plotNodesWithNumbersInside(total_node_table);
  %DrawDiscontinuity(total_node_table,result);
  %checkNodes(total_node_table);
  %checkElementEquilibirum(total_node_table);
@@ -45,9 +56,9 @@ total_node_table = round(total_node_table,3);
 A2 = [A_element;A_discontinuity;A_bound];
 B2 = [B_element;B_discontinuity;B_Boundary];
 A1 = A_Yield;
-B1 = B_yield;
+B1 = sparse(B_yield);
 
-f=full(C_matrix');
+f=-(C_matrix');
 %% using gurobi
 % A=[A1;A2];
 % b=[B1;B2];
@@ -65,14 +76,15 @@ f=full(C_matrix');
 
 %% using linprog
 
- %options = optimset('MaxIter',10000000,'Display','final','TolFun',1e-3,'TolX',1e-3);
- [solution,fval,exitflag,output]=linprog(f,A1,B1,A2,B2); %,[],[],options
+ options = optimset('MaxIter',1e7,'Display','final','TolFun',1e-3,'TolX',1e-3); %'MaxIter',100000000,
+ [X,fval,exitflag,output]=linprog(f,A1,B1,A2,B2,[],[],options); %,[],[],options
 
  %% Display results
 
 N_c= -fval/(c*B);
 N_g = -(fval)/(gamma*B*B);
 N_q = -(fval);
+fprintf("Nlf = %d, Ndf = %d, Nd = %d, Nb=%d \n",Nlf,Ndf,Nd,Nb);
 fprintf("p = %d, c = %d, fi = %d \n",p,c,fi);
 disp("Collapse Load: "+ -fval);
 disp("Nc: "+N_c);
@@ -94,7 +106,7 @@ function [A_element,B_element, A_Yield, B_yield,A_bound,B_Boundary,A_discontinui
 end
 
 %% function to genrate fan mesh
-function [total_node_table,no_of_element] = generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd)
+function [total_node_table,no_of_element] = generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd,Nrf)
 
 y_coor_of_symm_side = linspace(0,-Df,Ndf+1);
 y_coor_of_footing_edge_side = zeros(size(y_coor_of_symm_side)); % footing edge y-coor to connect to the symm side to draw radial lines
@@ -112,7 +124,7 @@ y_coor_of_footing_edge_for_below = zeros(size(x_coor_of_footing_edge_for_below))
 plot([x_coor_of_footing_edge_for_below;x_coor_of_fan_base],[y_coor_of_footing_edge_for_below;y_coor_of_fan_base],'k-');
 
 %for drawing inclined lines on right side
-y_coor_of_rightside_fan = linspace(0,-(Df+D),Ndf+1);
+y_coor_of_rightside_fan = linspace(0,-(Df+D),Nrf+1);
 x_coor_of_rightside_fan = L*ones(size(y_coor_of_rightside_fan));
 plot([x_coor_of_footing_edge_side;x_coor_of_rightside_fan],[y_coor_of_footing_edge_side;y_coor_of_rightside_fan],'k-');
 
@@ -137,8 +149,8 @@ grid on;
 
 [node_left_fan_total] = GetYCoordinateLeftRight(Nb,B,Ndf,Df,x_coor_of_footing_base,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,y_coor_of_symm_side,x_coor_of_symm_side,y_coor_of_left_incl_line);
 [node_middle_fan] =GetXCoordinateMiddle(B,Nb,Df,Lf, Nlf, y_coor_of_left_incl_line, x_coor_of_right_incl_line,x_coor_of_footing_edge_for_below,x_coor_of_fan_base,y_coor_of_footing_edge_for_below,y_coor_of_fan_base);
-[y_coor_of_symm_side,node_middle_main]= GenerateMainMesh(B,Nlf,Ndf,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd);
-[node_right_side] =GetYCoordinate_For_Right_mesh(y_coor_of_symm_side,Nb,Nd,B,L,D,Df,Ndf,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,x_coor_of_rightside_fan,y_coor_of_rightside_fan,y_coor_of_left_incl_line);
+[y_coor_of_symm_side,node_middle_main]= GenerateMainMesh(B,Nlf,Nb,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd);
+[node_right_side] =GetYCoordinate_For_Right_mesh(y_coor_of_symm_side,Nb,Nd,B,L,D,Df,Nrf,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,x_coor_of_rightside_fan,y_coor_of_rightside_fan,y_coor_of_left_incl_line);
 
 total_node_table = [node_left_fan_total; node_middle_main;node_middle_fan; node_right_side];
 sized=size(total_node_table);
@@ -149,18 +161,19 @@ no_of_element = sized(1)/3;
 end
 
 %% function to generate Main mesh
-function [y_coor_of_symm_side,node_middle_main]= GenerateMainMesh(B,Nlf,Ndf,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd)
+function [y_coor_of_symm_side,node_middle_main]= GenerateMainMesh(B,Nlf,Nb,Lf,Df,D,L,x_coor_of_fan_base,y_coor_of_fan_base,Nd)
 x_coor_of_boundary_base = linspace(0,L,Nlf+1);
 y_coor_of_boundary_base = -(Df+D)*ones(size(x_coor_of_boundary_base));
 plot([x_coor_of_fan_base;x_coor_of_boundary_base],[y_coor_of_fan_base;y_coor_of_boundary_base],'k-');
 
 %To draw the rectangular lines in main mesh
-initial_length = Df/Ndf;
-initial_increase_ratio = 1.1;
+initial_length = Df/Nb;
+initial_increase_ratio = 1.2;
 initial_length_of_main_mesh = initial_increase_ratio*initial_length; %this is 'a' for the gp series on the Depth part.
 
 %gp-series
 r = findRateOfIncrease((D-Df),initial_length_of_main_mesh,Nd);
+
 % disp(r);
 a=initial_length_of_main_mesh; sum=a;coord=zeros(1,Nd);coord(1)=a;
 Length = D-Df;i=2;
@@ -230,6 +243,7 @@ end
 %% function to get the Y_coord of the right side mesh
 function [node_right_side] = GetYCoordinate_For_Right_mesh(y_coor_of_symm_side,Nb,Nd,B,L,D,Df,Ndf,x_coor_of_footing_edge_side,y_coor_of_footing_edge_side,x_coor_of_rightside_fan,y_coor_of_rightside_fan,y_coor_of_left_incl_line)
 
+%Note: here Ndf = Nrf
 
 eqn_of_right_inclined_line = polyfit([B,L],[0,-(D+Df)],1);
 y_coor_of_left_incl_line = flip(y_coor_of_left_incl_line);
@@ -513,7 +527,7 @@ end
 
 %% Boundary condition
 function [A_bound,B_Boundary] = BoundaryCondition(left_bound_result,middle_bound_result,right_bound_result,no_of_element)
-    row = size(left_bound_result,1)+size(middle_bound_result,1)+2*size(right_bound_result,1); %+size(middle_bound_result,1)
+    row = size(left_bound_result,1)+2*size(right_bound_result,1); %+size(middle_bound_result,1)
     col = 9*no_of_element;
     A_bound =sparse(row,col);
     % for right boundary theta=0
@@ -532,15 +546,15 @@ function [A_bound,B_Boundary] = BoundaryCondition(left_bound_result,middle_bound
         B_Boundary_left(row_start,1)=0;
         row_start = row_start + 1;
     end
-    b_counter=1;
-    for i=1:size(middle_bound_result,1)
-        index = middle_bound_result(i,1);
-        col_start = 3*(index-1)+1;
-        A_bound(row_start,col_start:col_start+2)=T_m;
-        B_Boundary_middle(b_counter,1)=0;
-        row_start=row_start+1;
-        b_counter=b_counter+1;
-    end
+    % b_counter=1;
+    % for i=1:size(middle_bound_result,1)
+    %     index = middle_bound_result(i,1);
+    %     col_start = 3*(index-1)+1;
+    %     A_bound(row_start,col_start:col_start+2)=T_m;
+    %     B_Boundary_middle(b_counter,1)=0;
+    %     row_start=row_start+1;
+    %     b_counter=b_counter+1;
+    % end
     b_counter=1;
     for i = 1:size(right_bound_result, 1)
         index = right_bound_result(i, 1);
@@ -553,7 +567,7 @@ function [A_bound,B_Boundary] = BoundaryCondition(left_bound_result,middle_bound
     end 
     
      B_Boundary_right(b_counter-1,1)=0;
-     B_Boundary=[B_Boundary_left;B_Boundary_middle;B_Boundary_right]; % ;B_Boundary_middle
+     B_Boundary=[B_Boundary_left;B_Boundary_right]; % ;B_Boundary_middle
     
 end
 
@@ -821,3 +835,4 @@ function DrawBoundary(left_bound_result,middle_bound_result,right_bound_result)
     end
 end
 
+% end
