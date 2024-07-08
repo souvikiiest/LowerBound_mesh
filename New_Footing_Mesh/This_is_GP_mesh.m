@@ -11,9 +11,9 @@ warning('off','all');
 % function N_g = main(phi)
 %Inputs for fan mesh
 
-Nlf = 5; % division of fan base 5
+Nlf = 8; % division of fan base 5
 %Depth of fan mesh
-Ndf = 6; % division of fan dept(left) 3
+Ndf = 8; % division of fan dept(left) 3
 
 %All inputs
 B = 0.5;
@@ -23,14 +23,14 @@ L = 20*B; %Total extent of boundary
 Df=1*B;
 Lf = Df*(L-B)/(Df+D) + B; % length of fan base
 
-Nd = 15; %division for recatangular/symmetric  in main mesh 2*Nlf 
-Nb = 10; %division for rectangular division in fan mesh Nlf 3
+Nd = 10; %division for recatangular/symmetric  in main mesh 2*Nlf 15
+Nb = 5; %division for rectangular division in fan mesh Nlf 3
 Nrf = Ndf; %division for right side lines 
 
-p=36; %for yield function
-fi=0;
-c=20;
-gamma=0;
+p=24; %for yield function
+fi=20;
+c=0.0001;
+gamma=18;
 tic;
 %% Function call
 [total_node_table,no_of_element]=generateFanMesh(Lf,Df,Nlf,Ndf,B,Nb,D,L,Nd,Nrf);
@@ -56,10 +56,10 @@ ElemY = total_node_table(:,2);
 A2 = [A_element;A_discontinuity;A_bound];
 B2 = [B_element;B_discontinuity;B_Boundary];
 A1 = A_Yield;
-B1 = sparse(B_yield);
+B1 = (B_yield);
 
-f=-(C_matrix');
-%% using gurobi
+f=(C_matrix');
+% using gurobi
 % A=[A1;A2];
 % b=[B1;B2];
 % model.A = sparse(A);
@@ -76,8 +76,31 @@ f=-(C_matrix');
 
 %% using linprog
 
- options = optimset('MaxIter',1e7,'Display','final','TolFun',1e-3,'TolX',1e-3); %'MaxIter',100000000,
- [X,fval,exitflag,output]=linprog(f,A1,B1,A2,B2,[],[],options); %,[],[],options
+ %options = optimset('MaxIter',1e10,'Display','final','TolFun',1e-3,'TolX',1e-3); %'MaxIter',100000000,
+ %[X,fval,exitflag,output]=linprog(f,A1,B1,A2,B2,[],[],options); %,[],[],options
+
+ %% using mosek
+
+clear prob;
+prob.c = f;
+
+% Define the linear constraints
+prob.a = [A1; A2];
+prob.blc = [-inf * ones(size(B1)); B2]; % Lower bounds on constraints
+prob.buc = [B1; B2];                    % Upper bounds on constraints
+
+% Define bounds on the variables if any (use -inf and inf for unbounded variables)
+% Assuming no bounds are provided in the original linprog formulation
+n = length(f);
+prob.blx = -inf * ones(n, 1);
+prob.bux = inf * ones(n, 1);
+
+[r, res] = mosekopt('minimize echo(0)', prob);
+
+% Extract solution
+X = res.sol.itr.xx;
+fval = res.sol.itr.pobjval;
+exitflag = res.sol.itr.solsta;
 
  %% Display results
 
@@ -168,13 +191,12 @@ plot([x_coor_of_fan_base;x_coor_of_boundary_base],[y_coor_of_fan_base;y_coor_of_
 
 %To draw the rectangular lines in main mesh
 initial_length = Df/Nb;
-initial_increase_ratio = 1.2;
+initial_increase_ratio = 1.05;
 initial_length_of_main_mesh = initial_increase_ratio*initial_length; %this is 'a' for the gp series on the Depth part.
 
 %gp-series
 r = findRateOfIncrease((D-Df),initial_length_of_main_mesh,Nd);
 
-% disp(r);
 a=initial_length_of_main_mesh; sum=a;coord=zeros(1,Nd);coord(1)=a;
 Length = D-Df;i=2;
 while(sum<=Length)
@@ -385,6 +407,7 @@ r_initial_guess = 1.1; % This can be adjusted based on the problem context
 % Use fsolve to find the rate of increase r
 options = optimoptions('fsolve', 'Display', 'off');
 r = fsolve(sumGP, r_initial_guess, options);
+disp("r: "+r);
 end
 
 function [node_left_fan] = getNodes(B,x_coor_of_interior, y_coor_interior, x_coord_midpoint_fan_left, y_coord_midpoint_fan_left, include_last_triangle)
@@ -527,7 +550,7 @@ end
 
 %% Boundary condition
 function [A_bound,B_Boundary] = BoundaryCondition(left_bound_result,middle_bound_result,right_bound_result,no_of_element)
-    row = size(left_bound_result,1)+2*size(right_bound_result,1); %+size(middle_bound_result,1)
+    row = size(left_bound_result,1)+size(middle_bound_result,1)+2*size(right_bound_result,1); %+size(middle_bound_result,1)
     col = 9*no_of_element;
     A_bound =sparse(row,col);
     % for right boundary theta=0
@@ -546,15 +569,15 @@ function [A_bound,B_Boundary] = BoundaryCondition(left_bound_result,middle_bound
         B_Boundary_left(row_start,1)=0;
         row_start = row_start + 1;
     end
-    % b_counter=1;
-    % for i=1:size(middle_bound_result,1)
-    %     index = middle_bound_result(i,1);
-    %     col_start = 3*(index-1)+1;
-    %     A_bound(row_start,col_start:col_start+2)=T_m;
-    %     B_Boundary_middle(b_counter,1)=0;
-    %     row_start=row_start+1;
-    %     b_counter=b_counter+1;
-    % end
+    b_counter=1;
+    for i=1:size(middle_bound_result,1)
+        index = middle_bound_result(i,1);
+        col_start = 3*(index-1)+1;
+        A_bound(row_start,col_start:col_start+2)=T_m;
+        B_Boundary_middle(b_counter,1)=0;
+        row_start=row_start+1;
+        b_counter=b_counter+1;
+    end
     b_counter=1;
     for i = 1:size(right_bound_result, 1)
         index = right_bound_result(i, 1);
@@ -567,7 +590,7 @@ function [A_bound,B_Boundary] = BoundaryCondition(left_bound_result,middle_bound
     end 
     
      B_Boundary_right(b_counter-1,1)=0;
-     B_Boundary=[B_Boundary_left;B_Boundary_right]; % ;B_Boundary_middle
+     B_Boundary=[B_Boundary_left;B_Boundary_middle;B_Boundary_right]; % ;B_Boundary_middle
     
 end
 
@@ -776,8 +799,8 @@ end
 function DrawDiscontinuity(total_node_table,result)
     hold on;
     for i=1:size(result,1)
-        X=[total_node_table(result(i,2),1),total_node_table(result(i,3),1)];
-        Y=[total_node_table(result(i,2),2),total_node_table(result(i,3),2)];
+        X=[total_node_table(result(i,1),1),total_node_table(result(i,4),1)];
+        Y=[total_node_table(result(i,1),2),total_node_table(result(i,4),2)];
         plot(X,Y,'r','LineWidth',2);
     end
     
